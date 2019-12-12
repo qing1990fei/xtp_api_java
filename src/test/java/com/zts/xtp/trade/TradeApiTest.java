@@ -43,7 +43,9 @@ public class TradeApiTest {
         tradeApi = new TradeApi(tradeSpi);
 
         tradeApi.init(CLIENT_ID, TRADE_KEY,
-                DATA_FOLDER, XtpLogLevel.XTP_LOG_LEVEL_INFO, JniLogLevel.JNI_LOG_LEVEL_INFO);
+                DATA_FOLDER, XtpLogLevel.XTP_LOG_LEVEL_TRACE, JniLogLevel.JNI_LOG_LEVEL_INFO, XtpTeResumeType.XTP_TERT_RESTART);
+//        tradeApi.subscribePublicTopic(XtpTeResumeType.XTP_TERT_RESTART);
+//        tradeApi.setHeartBeatInterval(30);
         sessionId = tradeApi.login(XTP_TRADE_SERVER_IP, XTP_TRADE_SERVER_PORT,
                 ACCOUNT, PASSWORD, TransferProtocol.XTP_PROTOCOL_TCP);
 
@@ -263,9 +265,60 @@ public class TradeApiTest {
         System.out.println("testQueryOptionAuctionInfo");
         int result = tradeApi.queryOptionAuctionInfo(null, sessionId, 13);
         Assert.assertEquals(result, 0);
-
     }
 
+	@Test
+	public void testGetTradingDay() {
+		System.out.println("testGetTradingDay");
+		String tradingDay = tradeApi.getTradingDay();
+		System.out.println("testGetTradingDay tradingDay: " + tradingDay);
+		Assert.assertNotNull(tradingDay);
+	}
+
+    @Test
+    public void testGetApiVersion() {
+        System.out.println("testGetApiVersion");
+        String version = tradeApi.getApiVersion();
+        System.out.println("testGetApiVersion version: " + version);
+        Assert.assertEquals("1.1.18.19", version);
+    }
+
+    @Test
+    public void testGetClientIDByXTPID() {
+        System.out.println("testGetClientIDByXTPID");
+        short clientId = tradeApi.getClientIDByXTPID("1009073519666951445");
+        System.out.println("testGetClientIDByXTPID clientId: " + clientId);
+        Assert.assertNotNull(clientId);
+    }
+
+	@Test
+	public void testGetAccountByXTPID() {
+		System.out.println("testGetAccountByXTPID");
+		String account = tradeApi.getAccountByXTPID("396628509490944857");
+		System.out.println("testGetAccountByXTPID account: " + account);
+		Assert.assertNotNull(account);
+	}
+
+    @Test
+    public void testIsServerRestart() {
+        System.out.println("testIsServerRestart");
+        boolean result = tradeApi.isServerRestart(sessionId);
+        System.out.println("testIsServerRestart: " + result);
+    }
+
+    @Test
+    public void testQueryOrdersByPage() {
+        System.out.println("testQueryOrdersByPage");
+        OrderQueryByPageReq req = OrderQueryByPageReq.builder().reqCount(10).reserved(0).build();
+        tradeApi.queryOrdersByPage(req, sessionId,13);
+    }
+
+    @Test
+    public void testQueryTradesByPage() {
+        System.out.println("testQueryTradesByPage");
+        TradeQueryByPageReq req = TradeQueryByPageReq.builder().reqCount(10).reserved(0).build();
+        tradeApi.queryTradesByPage(req, sessionId,13);
+    }
 
     //==============Common Functions=========
     private String insertOrder() {

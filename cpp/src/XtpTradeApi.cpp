@@ -35,7 +35,7 @@ void Trade::OnError(XTPRI *error_info) {
 }
 
 void Trade::OnTradeEvent(XTPTradeReport *trade_info, uint64_t session_id) {
-    LOG(INFO) << __PRETTY_FUNCTION__ ;
+//    LOG(INFO) << __PRETTY_FUNCTION__ ;
 
     JNIEnv* env;
     // prepare the invocation
@@ -178,8 +178,71 @@ void Trade::OnQueryTrade(XTPQueryTradeRsp *trade_info, XTPRI *error_info, int re
 
 }
 
-void Trade::OnQueryPosition(XTPQueryStkPositionRsp *position, XTPRI *error_info, int request_id, bool is_last, uint64_t session_id) {
+void Trade::OnQueryOrderByPage(XTPQueryOrderRsp *order_info, int64_t req_count, int64_t order_sequence, int64_t query_reference, int request_id, bool is_last, uint64_t session_id) {
     LOG(INFO) << __PRETTY_FUNCTION__ ;
+
+     JNIEnv* env;
+    // prepare the invocation
+    env = preInvoke();
+    jclass tradePluginClass_ = env->GetObjectClass(trade_plugin_obj_);
+    assert(tradePluginClass_ != NULL);
+    jmethodID jm_queryOrderResult = env->GetMethodID(tradePluginClass_, "onQueryOrderByPage",
+    "(Lcom/zts/xtp/trade/model/response/OrderResponse;JJJLjava/lang/String;)V");
+
+    jobject tradeOrderInfoObj=NULL;
+    //fetch the default construct
+    jmethodID defaultConstr = env->GetMethodID(trade_order_info_class_, "<init>","()V");
+    if (defaultConstr == NULL) {
+        jvm_->DetachCurrentThread();
+        return;
+    }
+    //create the object
+    tradeOrderInfoObj = env->NewObject(trade_order_info_class_, defaultConstr);
+    if (tradeOrderInfoObj == NULL) {
+        jvm_->DetachCurrentThread();
+        return;
+    }
+    generateOrderInfoObj(env, tradeOrderInfoObj,order_info,request_id, is_last);
+
+    jstring strSessionId = env->NewStringUTF((std::to_string(session_id)).c_str());
+    env->CallVoidMethod(trade_plugin_obj_, jm_queryOrderResult, tradeOrderInfoObj, req_count, order_sequence, query_reference , strSessionId);
+    jvm_->DetachCurrentThread();
+}
+
+void Trade::OnQueryTradeByPage(XTPQueryTradeRsp *trade_info, int64_t req_count, int64_t trade_sequence, int64_t query_reference, int request_id, bool is_last, uint64_t session_id) {
+    LOG(INFO) << __PRETTY_FUNCTION__ ;
+
+     JNIEnv* env;
+     // prepare the invocation
+     env = preInvoke();
+     jclass tradePluginClass_ = env->GetObjectClass(trade_plugin_obj_);
+     assert(tradePluginClass_ != NULL);
+     jmethodID jm_queryTradeResult = env->GetMethodID(tradePluginClass_, "onQueryTradeByPage",
+     "(Lcom/zts/xtp/trade/model/response/TradeResponse;JJJLjava/lang/String;)V");
+
+     jobject tradeReportObj=NULL;
+     //fetch the default construct
+     jmethodID defaultConstr = env->GetMethodID(trade_report_class_, "<init>","()V");
+     if (defaultConstr == NULL) {
+         jvm_->DetachCurrentThread();
+         return;
+     }
+     //create the object
+     tradeReportObj = env->NewObject(trade_report_class_, defaultConstr);
+     if (tradeReportObj == NULL) {
+         jvm_->DetachCurrentThread();
+         return;
+     }
+     generateTradeReportObj(env, tradeReportObj,trade_info,request_id, is_last);
+
+     jstring strSessionId = env->NewStringUTF((std::to_string(session_id)).c_str());
+     env->CallVoidMethod(trade_plugin_obj_, jm_queryTradeResult, tradeReportObj, req_count, trade_sequence, query_reference, strSessionId);
+     jvm_->DetachCurrentThread();
+
+}
+
+void Trade::OnQueryPosition(XTPQueryStkPositionRsp *position, XTPRI *error_info, int request_id, bool is_last, uint64_t session_id) {
+//    LOG(INFO) << __PRETTY_FUNCTION__ ;
 
     JNIEnv* env;
     // prepare the invocation
@@ -322,7 +385,7 @@ void Trade::OnQueryPosition(XTPQueryStkPositionRsp *position, XTPRI *error_info,
 }
 
 void Trade::OnQueryAsset(XTPQueryAssetRsp *asset, XTPRI *error_info, int request_id, bool is_last, uint64_t session_id) {
-    LOG(INFO) << __PRETTY_FUNCTION__ ;
+//    LOG(INFO) << __PRETTY_FUNCTION__ ;
 
     JNIEnv* env;
     // prepare the invocation
@@ -489,7 +552,7 @@ void Trade::OnQueryAsset(XTPQueryAssetRsp *asset, XTPRI *error_info, int request
 }
 
 void Trade::OnOrderEvent(XTPOrderInfo *order_info, XTPRI *error_info, uint64_t session_id) {
-    LOG(INFO) << __PRETTY_FUNCTION__ ;
+//    LOG(INFO) << __PRETTY_FUNCTION__ ;
 
     if(error_info->error_id!=0){
     	LOG(ERROR) << __PRETTY_FUNCTION__ << " error_info:" << error_info->error_msg;
@@ -699,7 +762,7 @@ void Trade::OnQueryFundTransfer(XTPFundTransferNotice *fund_transfer_info, XTPRI
 
     jobject resultObj = NULL;
     int errorCode = error_info->error_id;
-    if (errorCode == 0) {
+//    if (errorCode == 0) {//必须注释这里
         //fetch the default construct
         jmethodID defaultConstr = env->GetMethodID(fund_transfer_notice_class_, "<init>","()V");
         if (defaultConstr == NULL) {
@@ -715,7 +778,7 @@ void Trade::OnQueryFundTransfer(XTPFundTransferNotice *fund_transfer_info, XTPRI
         }
 
         generateFundTransferNoticeObj(env, resultObj, fund_transfer_info, request_id, is_last);
-    }
+//    }
 
     jstring strSessionId = env->NewStringUTF((std::to_string(session_id)).c_str());
     env->CallVoidMethod(trade_plugin_obj_, jm_event, resultObj, errorMsgObj, strSessionId);
@@ -760,7 +823,7 @@ void Trade::OnFundTransfer(XTPFundTransferNotice *fund_transfer_info, XTPRI *err
 
     jobject resultObj = NULL;
     int errorCode = error_info->error_id;
-    if (errorCode == 0) {
+//    if (errorCode == 0) {//这里必须注释掉
         //fetch the default construct
         jmethodID defaultConstr = env->GetMethodID(fund_transfer_notice_class_, "<init>","()V");
         if (defaultConstr == NULL) {
@@ -776,7 +839,7 @@ void Trade::OnFundTransfer(XTPFundTransferNotice *fund_transfer_info, XTPRI *err
         }
 
         generateFundTransferNoticeObj(env, resultObj, fund_transfer_info, 0, true);
-    }
+//    }
 
     jstring strSessionId = env->NewStringUTF((std::to_string(session_id)).c_str());
     env->CallVoidMethod(trade_plugin_obj_, jm_event, resultObj, errorMsgObj, strSessionId);
@@ -1121,8 +1184,10 @@ void Trade::generateOrderInfoObj(JNIEnv* env, jobject& tradeOrderInfoObj,XTPOrde
     env->CallVoidMethod(tradeOrderInfoObj, jm_setOrderCancelClientId, order_info->order_cancel_client_id);
 
     //call setOrderCancelXtpId
-    jmethodID jm_setOrderCancelXtpId = env->GetMethodID(trade_order_info_class_, "setOrderCancelXtpId", "(I)V");
-    env->CallVoidMethod(tradeOrderInfoObj, jm_setOrderCancelXtpId, order_info->order_cancel_xtp_id);
+    jmethodID jm_setOrderCancelXtpId = env->GetMethodID(trade_order_info_class_, "setOrderCancelXtpId", "(Ljava/lang/String;)V");
+    jstring orderCancelXtpIdStr = env->NewStringUTF((std::to_string(order_info->order_cancel_xtp_id)).c_str());
+    env->CallVoidMethod(tradeOrderInfoObj, jm_setOrderCancelXtpId, orderCancelXtpIdStr);
+
 
     //call setTicker
     jmethodID jm_setTicker = env->GetMethodID(trade_order_info_class_, "setTicker", "(Ljava/lang/String;)V");
@@ -1154,12 +1219,8 @@ void Trade::generateOrderInfoObj(JNIEnv* env, jobject& tradeOrderInfoObj,XTPOrde
     env->CallVoidMethod(tradeOrderInfoObj, jm_setSideType, xtpSideType);
 
     //call setPositionEffectType
-    int positionEffect = XTP_POSITION_EFFECT_UNKNOWN;
-    if (order_info->business_type == XTP_BUSINESS_TYPE::XTP_BUSINESS_TYPE_OPTION)
-    {
-        positionEffect = (int)order_info->position_effect;
-    }
-    LOG(INFO)<< "generateOrderInfoObj: position_effect" << order_info->position_effect << "; positionEffect: " << positionEffect;
+    int positionEffect = (int)order_info->position_effect;
+//    LOG(INFO)<< "generateOrderInfoObj: position_effect" << order_info->position_effect << "; positionEffect: " << positionEffect;
     jmethodID jm_setPositionEffectType = env->GetMethodID(trade_order_info_class_, "setPositionEffectType", "(I)V");
     env->CallVoidMethod(tradeOrderInfoObj, jm_setPositionEffectType, positionEffect);
 
@@ -1229,8 +1290,10 @@ void Trade::generateCancelInfoObj(JNIEnv* env, jobject& tradeCancelOrderInfoObj,
     jstring orderXtpIdStr = env->NewStringUTF((std::to_string(cancel_info->order_xtp_id)).c_str());
     env->CallVoidMethod(tradeCancelOrderInfoObj, jm_setOrderXtpId, orderXtpIdStr);
 
-    jmethodID jm_setOrderCancelXtpId = env->GetMethodID(order_cancel_info_class_, "setOrderCancelXtpId", "(I)V");
-    env->CallVoidMethod(tradeCancelOrderInfoObj, jm_setOrderCancelXtpId, cancel_info->order_cancel_xtp_id);
+    jmethodID jm_setOrderCancelXtpId = env->GetMethodID(order_cancel_info_class_, "setOrderCancelXtpId", "(Ljava/lang/String;)V");
+    jstring orderCancelXtpIdStr = env->NewStringUTF((std::to_string(cancel_info->order_cancel_xtp_id)).c_str());
+    env->CallVoidMethod(tradeCancelOrderInfoObj, jm_setOrderCancelXtpId, orderCancelXtpIdStr);
+
 
     //call setRequestId
      jmethodID jm_setRequestId = env->GetMethodID(order_cancel_info_class_, "setRequestId", "(I)V");
@@ -1320,11 +1383,7 @@ void  Trade::generateTradeReportObj(JNIEnv* env, jobject& tradeReportObj,XTPTrad
     env->CallVoidMethod(tradeReportObj, jm_setSide, xtpSideType);
 
     //call setPositionEffectType
-    int positionEffect = XTP_POSITION_EFFECT_UNKNOWN;
-    if (trade_info->business_type == XTP_BUSINESS_TYPE::XTP_BUSINESS_TYPE_OPTION)
-    {
-        positionEffect = (int)trade_info->position_effect;
-    }
+    int positionEffect = (int)trade_info->position_effect;
     jmethodID jm_setPositionEffectType = env->GetMethodID(trade_report_class_, "setPositionEffectType", "(I)V");
     env->CallVoidMethod(tradeReportObj, jm_setPositionEffectType, positionEffect);
 
@@ -1564,6 +1623,10 @@ void  Trade::generateIPOTickerObj(JNIEnv* env, jobject& targetObj, XTPQueryIPOTi
     jmethodID jm_setTickerName = env->GetMethodID(query_ipo_ticker_rsp_class_, "setTickerName", "(Ljava/lang/String;)V");
     env->CallVoidMethod(targetObj, jm_setTickerName, jtickernamestr);
 
+    int tickerType = (int)sourceObj->ticker_type;
+    jmethodID jm_setTickerType = env->GetMethodID(query_ipo_ticker_rsp_class_, "setTickerType", "(I)V");
+    env->CallVoidMethod(targetObj, jm_setTickerType, tickerType);
+
     jmethodID jm_setPrice = env->GetMethodID(query_ipo_ticker_rsp_class_, "setPrice", "(D)V");
     assert(jm_setPrice != NULL);
     double new_price = sourceObj->price;
@@ -1593,6 +1656,12 @@ void  Trade::generateIPOQuotaObj(JNIEnv* env, jobject& targetObj, XTPQueryIPOQuo
 
     jmethodID jm_setQuantity = env->GetMethodID(query_ipo_quota_rsp_class_, "setQuantity", "(I)V");
     env->CallVoidMethod(targetObj, jm_setQuantity, sourceObj->quantity);
+
+    jmethodID jm_setTech_quantity = env->GetMethodID(query_ipo_quota_rsp_class_, "setTech_quantity", "(I)V");
+    env->CallVoidMethod(targetObj, jm_setTech_quantity, sourceObj->tech_quantity);
+
+    jmethodID jm_setUnused = env->GetMethodID(query_ipo_quota_rsp_class_, "setUnused", "(I)V");
+    env->CallVoidMethod(targetObj, jm_setUnused, sourceObj->unused);
 
     jmethodID jm_setRequestId = env->GetMethodID(query_ipo_quota_rsp_class_, "setRequestId", "(I)V");
     assert(jm_setRequestId != NULL);

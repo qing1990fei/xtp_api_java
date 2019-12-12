@@ -6,6 +6,8 @@
 
 #include <string>
 #include <iostream>
+#include "glog/logging.h"
+
 
 class XtpQuote : public XTP::API::QuoteSpi {
 private:
@@ -26,6 +28,14 @@ private:
     JavaVM *jvm_;
     JavaVMAttachArgs att_args_;
     jobject quote_plugin_obj_;
+
+    //OnTickByTick里的缓存
+    bool bAttachedTickByTick = false;
+    JNIEnv* env = NULL;
+    jclass pluginClass = NULL;
+    jmethodID jm_onTickByTickEntrust = NULL;
+    jmethodID jm_onTickByTickTrade = NULL;
+    //=================
 
     jclass xtp_error_msg_class_;
     jclass xtp_specific_ticker_class_;
@@ -170,7 +180,12 @@ public:
     }
 
     void SetHeartBeatInterval(int interval) {
-        api_->SetHeartBeatInterval(interval);
+        if(api_!=NULL){
+            api_->SetHeartBeatInterval(interval);
+        }
+        else{
+            LOG(ERROR) << __PRETTY_FUNCTION__<<"setHeartBeatInterval mast call after init" ;
+        }
     }
 
     int SubscribeMarketData(char *ticker[], int count, XTP_EXCHANGE_TYPE exchange_id) {
@@ -270,6 +285,9 @@ public:
     }
 
     void SetUDPBufferSize(uint32_t buff_size){
+        if(api_==NULL){
+            LOG(ERROR) << __PRETTY_FUNCTION__<<"SetUDPBufferSize mast call after init" ;
+        }
         api_->SetUDPBufferSize(buff_size);
     }
 

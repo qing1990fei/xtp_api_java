@@ -38,7 +38,6 @@ private:
     jclass query_option_auctionInfo_rsp_class_;
     jclass order_cancel_info_class_;
 
-
 public:
 
     void OnDisconnected(uint64_t session_id, int reason);
@@ -54,6 +53,10 @@ public:
     void OnQueryOrder(XTPQueryOrderRsp *order_info, XTPRI *error_info, int request_id, bool is_last, uint64_t session_id) ;
 
     void OnQueryTrade(XTPQueryTradeRsp *trade_info, XTPRI *error_info, int request_id, bool is_last, uint64_t session_id) ;
+
+    void OnQueryOrderByPage(XTPQueryOrderRsp *order_info, int64_t req_count, int64_t order_sequence, int64_t query_reference, int request_id, bool is_last, uint64_t session_id);
+
+    void OnQueryTradeByPage(XTPQueryTradeRsp *trade_info, int64_t req_count, int64_t trade_sequence, int64_t query_reference, int request_id, bool is_last, uint64_t session_id);
 
     void OnQueryPosition(XTPQueryStkPositionRsp *position, XTPRI *error_info, int request_id, bool is_last, uint64_t session_id);
 
@@ -104,10 +107,10 @@ public:
 
     ~Trade();
 
-    void Init(XTP_LOG_LEVEL logLevel)
+    void Init(XTP_LOG_LEVEL logLevel,XTP_TE_RESUME_TYPE resumeType)
     {
         api_ = XTP::API::TraderApi::CreateTraderApi(client_id_, file_path_.c_str(), logLevel);
-        api_->SubscribePublicTopic(XTP_TERT_RESTART);
+        api_->SubscribePublicTopic(resumeType);
         api_->SetSoftwareKey(key_.c_str());
         api_->SetSoftwareVersion("1.1.0");
         api_->RegisterSpi(this);
@@ -117,6 +120,23 @@ public:
     {
         if(api_)
             api_->Release();
+    }
+
+    void SubscribePublicTopic(XTP_TE_RESUME_TYPE resumeType)
+    {
+        if(api_!=NULL){
+            api_->SubscribePublicTopic(resumeType);
+        }
+        else{
+            LOG(ERROR) << __PRETTY_FUNCTION__<<"subscribePublicTopic mast call after init" ;
+        }
+    }
+
+    void SetHeartBeatInterval(uint32_t interval){
+        if(api_==NULL){
+            LOG(ERROR) << __PRETTY_FUNCTION__<<"setHeartBeatInterval mast call after init" ;
+        }
+        api_->SetHeartBeatInterval(interval);
     }
 
     uint64_t Login(std::string server_ip, uint16_t server_port, std::string username, std::string password, XTP_PROTOCOL_TYPE protocol)
@@ -163,6 +183,16 @@ public:
     {
        return api_->QueryTrades(&query_param, session_id, request_id);
 
+    }
+
+    void QueryOrdersByPage(const XTPQueryOrderByPageReq query_param, uint64_t session_id, int request_id)
+    {
+        api_->QueryOrdersByPage(&query_param, session_id, request_id);
+    }
+
+    void QueryTradesByPage(const XTPQueryTraderByPageReq query_param, uint64_t session_id, int request_id)
+    {
+        api_->QueryTradesByPage(&query_param, session_id, request_id);
     }
 
     int QueryPosition(const char *ticker, uint64_t session_id, int request_id)
@@ -217,6 +247,31 @@ public:
             return api_->QueryOptionAuctionInfo(NULL, session_id, request_id);
         }
         return api_->QueryOptionAuctionInfo(&query_param, session_id, request_id);
+    }
+
+	const char* GetTradingDay()
+	{
+		return api_->GetTradingDay();
+	}
+
+	const char* GetApiVersion()
+	{
+		return api_->GetApiVersion();
+	}
+
+	uint8_t GetClientIDByXTPID(uint64_t order_xtp_id)
+	{
+		return api_->GetClientIDByXTPID(order_xtp_id);
+	}
+
+	const char* GetAccountByXTPID(uint64_t order_xtp_id)
+	{
+		return api_->GetAccountByXTPID(order_xtp_id);
+	}
+
+	bool IsServerRestart(uint64_t session_id)
+    {
+        return api_->IsServerRestart(session_id);
     }
 private:
 

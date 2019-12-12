@@ -27,7 +27,7 @@ public class OrderResponse {
     /**报单操作引用，用户自定义*/
     private int orderCancelClientId;
     /**撤单在XTP系统中的id，在XTP系统中唯一*/
-    private int orderCancelXtpId;
+    private String orderCancelXtpId;
     /**合约代码*/
     private String ticker;
     /**交易市场*/
@@ -82,7 +82,6 @@ public class OrderResponse {
     }
 
     public void setPositionEffectType(int type) {
-        if(type>7) type = 7;
         positionEffectType = PositionEffectType.values()[type];
     }
 

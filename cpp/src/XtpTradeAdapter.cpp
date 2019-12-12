@@ -28,7 +28,7 @@ JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_initGlog
 }
 
 JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_tradeInit
-  (JNIEnv *env, jobject obj, jshort clientId, jstring key, jstring logFolder, jobject jLogLevel)
+  (JNIEnv *env, jobject obj, jshort clientId, jstring key, jstring logFolder, jobject jLogLevel, jobject resumeTypeObj)
 {
     Trade *ptrade;
     if(NULL == ptrade_)
@@ -89,7 +89,12 @@ JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_tradeInit
         jclass logLevelClass = env->FindClass("com/zts/xtp/common/enums/XtpLogLevel");
         jmethodID getLogLevelValue = env->GetMethodID(logLevelClass, "getValue", "()I");
         XTP_LOG_LEVEL logLevel = (XTP_LOG_LEVEL)env->CallIntMethod(jLogLevel, getLogLevelValue);
-        ptrade->Init(logLevel);
+
+        jclass resumeTypeClass = env->FindClass("com/zts/xtp/common/enums/XtpTeResumeType");
+        jmethodID resumeTypeMethod = env->GetMethodID(resumeTypeClass, "getType", "()I");
+        XTP_TE_RESUME_TYPE resumeType = (XTP_TE_RESUME_TYPE)env->CallIntMethod(resumeTypeObj, resumeTypeMethod);
+
+        ptrade->Init(logLevel,resumeType);
 
         ptrade_=ptrade;
 
@@ -100,6 +105,34 @@ JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_tradeInit
 
     setHandle(env, obj, ptrade);
 }
+
+JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_subscribePublicTopic (JNIEnv *env, jobject obj, jobject resumeTypeObj)
+{
+    Trade *ptrade = getHandle<Trade>(env, obj);
+    if (ptrade) {
+        jclass resumeTypeClass = env->FindClass("com/zts/xtp/common/enums/XtpTeResumeType");
+        jmethodID resumeTypeMethod = env->GetMethodID(resumeTypeClass, "getType", "()I");
+        XTP_TE_RESUME_TYPE resumeType = (XTP_TE_RESUME_TYPE)env->CallIntMethod(resumeTypeObj, resumeTypeMethod);
+
+        ptrade->SubscribePublicTopic(resumeType);
+    }else{
+        LOG(ERROR) << "trade subscribePublicTopic failed! It mast be call before trade login and after trade init!";
+    }
+
+    return;
+}
+
+
+JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_setHeartBeatInterval (JNIEnv *env, jobject obj, jint interval)
+{
+    Trade *ptrade = getHandle<Trade>(env, obj);
+    if (ptrade) {
+        ptrade->SetHeartBeatInterval(interval);
+    }else{
+        LOG(ERROR) << "trade setHeartBeatInterval failed! It mast be call before trade login and after trade init!";
+    }
+}
+
 
 JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_disconnect (JNIEnv *env, jobject obj)
 {
@@ -246,9 +279,9 @@ jstring JNICALL Java_com_zts_xtp_trade_api_TradeApi_insertOrder(JNIEnv *env, job
      orderInfo.position_effect = (XTP_POSITION_EFFECT_TYPE)(positionEffect);
      string str_position_effect;
      str_position_effect = orderInfo.position_effect;
-     LOG(INFO)<< "insert order: sessionId: " << sessionId << "; ticker: " << orderInfo.ticker << "; market: " << orderInfo.market \
+//     LOG(INFO)<< "insert order: sessionId: " << sessionId << "; ticker: " << orderInfo.ticker << "; market: " << orderInfo.market \
       << "; price: " << orderInfo.price << "; stop_price: " << orderInfo.stop_price << "; quantity: " << orderInfo.quantity \
-       << "; price_type: " << orderInfo.price_type << "; side: " << sideType << "; business_type: " << orderInfo.business_type
+       << "; price_type: " << orderInfo.price_type << "; side: " << sideType << "; business_type: " << orderInfo.business_type \
         << "; position_effect: " + str_position_effect;
 
     uint64_t orderId = ptrade->InsertOrder(orderInfo, sessionId);
@@ -362,6 +395,37 @@ jint JNICALL Java_com_zts_xtp_trade_api_TradeApi_queryOrders(JNIEnv *env, jobjec
     return result;
 }
 
+JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_queryOrdersByPage(JNIEnv *env, jobject obj, jobject queryParam, jstring strSessionId, jint requestId)
+{
+
+    //get the trader pointer
+    Trade *ptrade = getHandle<Trade>(env, obj);
+
+    uint64_t sessionId = 0;
+    const char *char_sessionId = env->GetStringUTFChars(strSessionId, 0);
+    std::stringstream(char_sessionId)>> sessionId;
+
+    //build the query parameter
+    XTPQueryOrderByPageReq orderQueryParam;
+    memset(&orderQueryParam,0,sizeof(struct XTPQueryOrderByPageReq));
+
+    jclass queryParamClass = env->GetObjectClass(queryParam);
+    assert(queryParamClass != NULL);
+
+    jmethodID jm_getReqCount = env->GetMethodID(queryParamClass, "getReqCount", "()J");
+    orderQueryParam.req_count =  env->CallLongMethod(queryParam, jm_getReqCount);
+
+    jmethodID jm_getReference = env->GetMethodID(queryParamClass, "getReference", "()J");
+    orderQueryParam.reference =  env->CallLongMethod(queryParam, jm_getReference);
+
+    jmethodID jm_getReserved = env->GetMethodID(queryParamClass, "getReserved", "()J");
+    orderQueryParam.reserved =  env->CallLongMethod(queryParam, jm_getReserved);
+
+    ptrade->QueryOrdersByPage(orderQueryParam, sessionId, requestId);
+
+    env->ReleaseStringUTFChars(strSessionId, char_sessionId);
+}
+
 jint JNICALL Java_com_zts_xtp_trade_api_TradeApi_queryTrades(JNIEnv *env, jobject obj, jobject queryParam, jstring strSessionId, jint requestId)
 {
     //get the trader pointer
@@ -402,6 +466,37 @@ jint JNICALL Java_com_zts_xtp_trade_api_TradeApi_queryTrades(JNIEnv *env, jobjec
     env->ReleaseStringUTFChars(strSessionId, char_sessionId);
 
     return result;
+}
+
+JNIEXPORT void JNICALL Java_com_zts_xtp_trade_api_TradeApi_queryTradesByPage(JNIEnv *env, jobject obj, jobject queryParam, jstring strSessionId, jint requestId)
+{
+
+    //get the trader pointer
+    Trade *ptrade = getHandle<Trade>(env, obj);
+
+    uint64_t sessionId = 0;
+    const char *char_sessionId = env->GetStringUTFChars(strSessionId, 0);
+    std::stringstream(char_sessionId)>> sessionId;
+
+    //build the query parameter
+    XTPQueryTraderByPageReq traderQueryParam;
+    memset(&traderQueryParam,0,sizeof(struct XTPQueryTraderByPageReq));
+
+    jclass queryParamClass = env->GetObjectClass(queryParam);
+    assert(queryParamClass != NULL);
+
+    jmethodID jm_getReqCount = env->GetMethodID(queryParamClass, "getReqCount", "()J");
+    traderQueryParam.req_count =  env->CallLongMethod(queryParam, jm_getReqCount);
+
+    jmethodID jm_getReference = env->GetMethodID(queryParamClass, "getReference", "()J");
+    traderQueryParam.reference =  env->CallLongMethod(queryParam, jm_getReference);
+
+    jmethodID jm_getReserved = env->GetMethodID(queryParamClass, "getReserved", "()J");
+    traderQueryParam.reserved =  env->CallLongMethod(queryParam, jm_getReserved);
+
+    ptrade->QueryTradesByPage(traderQueryParam, sessionId, requestId);
+
+    env->ReleaseStringUTFChars(strSessionId, char_sessionId);
 }
 
 jint JNICALL Java_com_zts_xtp_trade_api_TradeApi_queryPosition(JNIEnv *env, jobject obj, jstring ticker, jstring strSessionId, jint requestId)
@@ -701,4 +796,58 @@ JNIEXPORT jint JNICALL Java_com_zts_xtp_trade_api_TradeApi_queryOptionAuctionInf
 
 
       return ptrade->QueryOptionAuctionInfo(req, sessionId, requestId, false);
+}
+
+JNIEXPORT jstring JNICALL Java_com_zts_xtp_trade_api_TradeApi_getTradingDay(JNIEnv *env, jobject clazz) {
+	// get the trader pointer
+	Trade *ptrade = getHandle<Trade>(env, clazz);
+
+	const char *tradingDay = ptrade->GetTradingDay();
+	return env->NewStringUTF(tradingDay);
+}
+
+JNIEXPORT jstring JNICALL Java_com_zts_xtp_trade_api_TradeApi_getApiVersion(JNIEnv *env, jobject clazz) {
+	// get the trader pointer
+	Trade *ptrade = getHandle<Trade>(env, clazz);
+
+	const char* version = ptrade->GetApiVersion();
+	return env->NewStringUTF(version);
+}
+
+JNIEXPORT jshort JNICALL Java_com_zts_xtp_trade_api_TradeApi_getClientIDByXTPID(JNIEnv *env, jobject clazz, jstring orderXTPId) {
+	// get the trader pointer
+	Trade *ptrade = getHandle<Trade>(env, clazz);
+
+	uint64_t xtpId;
+	const char *char_xtpOrderId = env->GetStringUTFChars(orderXTPId, 0);
+	std::stringstream(char_xtpOrderId) >> xtpId;
+
+	env->ReleaseStringUTFChars(orderXTPId, char_xtpOrderId);
+	return ptrade->GetClientIDByXTPID(xtpId);
+}
+
+JNIEXPORT jstring JNICALL Java_com_zts_xtp_trade_api_TradeApi_getAccountByXTPID(JNIEnv *env, jobject clazz, jstring orderXTPId) {
+	// get the trader pointer
+	Trade *ptrade = getHandle<Trade>(env, clazz);
+
+	uint64_t xtpId;
+	const char *char_xtpOrderId = env->GetStringUTFChars(orderXTPId, 0);
+	std::stringstream(char_xtpOrderId) >> xtpId;
+
+	const char* account = ptrade->GetAccountByXTPID(xtpId);
+	return env->NewStringUTF(account);
+}
+
+JNIEXPORT jboolean JNICALL Java_com_zts_xtp_trade_api_TradeApi_isServerRestart(JNIEnv *env, jobject obj, jstring strSessionId)
+{
+    //get the trader pointer
+    Trade *ptrade = getHandle<Trade>(env, obj);
+
+    uint64_t sessionId = 0;
+    const char *char_sessionId = env->GetStringUTFChars(strSessionId, 0);
+    std::stringstream(char_sessionId)>> sessionId;
+
+    env->ReleaseStringUTFChars(strSessionId, char_sessionId);
+
+    return ptrade->IsServerRestart(sessionId);
 }

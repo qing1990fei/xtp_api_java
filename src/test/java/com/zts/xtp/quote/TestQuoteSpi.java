@@ -1,14 +1,9 @@
 package com.zts.xtp.quote;
 
 import com.zts.xtp.common.model.ErrorMessage;
-import com.zts.xtp.quote.model.response.DepthMarketDataResponse;
-import com.zts.xtp.quote.model.response.DepthMarketDataExResponse;
-import com.zts.xtp.quote.model.response.OrderBookResponse;
-import com.zts.xtp.quote.model.response.SpecificTickerResponse;
-import com.zts.xtp.quote.model.response.TickByTickResponse;
-import com.zts.xtp.quote.model.response.TickerInfoResponse;
-import com.zts.xtp.quote.model.response.TickerPriceInfoResponse;
+import com.zts.xtp.quote.model.response.*;
 import com.zts.xtp.quote.spi.QuoteSpi;
+import org.junit.Assert;
 
 /**
  * Created by Guan Jian on 2018/8/15.
@@ -19,6 +14,7 @@ public class TestQuoteSpi implements QuoteSpi {
     public void onDisconnected(int reason) {
         System.out.println("onDisconnected");
         System.out.println(reason);
+        Assert.assertEquals(0, 0);
     }
 
     @Override
@@ -70,10 +66,23 @@ public class TestQuoteSpi implements QuoteSpi {
     }
 
     @Override
-    public void onTickByTick(TickByTickResponse tickData) {
-        System.out.println("onTickByTick");
-        System.out.println(tickData);
+    public void onTickByTickEntrust(int exchange_id, String ticker, long seq, long data_time, int type, int channel_no, long order_seq, double price, long qty, char side, char ord_type) {
+        System.out.println("onTickByTickEntrust");
+//        System.out.println("exchange_id:"+exchange_id+" ticker:"+ticker+" seq:"+seq+" data_time:"+data_time+" type:"+type+" channel_no:"+channel_no+" order_seq:"+order_seq+" price:"+price+" qty:"+qty+" side:"+side+" ord_type:"+ord_type);
     }
+
+
+    @Override
+    public void onTickByTickTrade(int exchange_id, String ticker, long seq, long data_time, int type, int channel_no, long order_seq, double price, long qty, double money, long bid_no, long ask_no, char trade_flag) {
+        System.out.println("onTickByTickTrade");
+//        System.out.println("exchange_id:"+exchange_id+" ticker:"+ticker+" seq:"+seq+" data_time:"+data_time+" type:"+type+" channel_no:"+channel_no+" order_seq:"+order_seq+" price:"+price+" qty:"+qty+" money:"+money+" bid_no:"+bid_no+" ask_no:"+ask_no+" trade_flag:"+trade_flag);
+    }
+
+//    @Override
+//    public void onTickByTick(TickByTickResponse tickData) {
+//        System.out.println("onTickByTick");
+//        System.out.println(tickData);
+//    }
 
     @Override
     public void onSubscribeAllMarketData(int exchangeId, ErrorMessage errorMessage) {
@@ -134,8 +143,8 @@ public class TestQuoteSpi implements QuoteSpi {
     @Override
     public void onDepthMarketData(DepthMarketDataResponse depthMarketData, DepthMarketDataExResponse depthQuote) {
         System.out.println("onDepthMarketData");
-        System.out.println(depthMarketData);
-        System.out.println(depthQuote);
+//        System.out.println(depthMarketData);
+//        System.out.println(depthQuote);
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.zts.xtp.common.enums.TransferProtocol;
 import com.zts.xtp.common.enums.XtpLogLevel;
 import com.zts.xtp.common.jni.JNILoadLibrary;
 import com.zts.xtp.common.model.ErrorMessage;
+import com.zts.xtp.common.enums.XtpTeResumeType;
 
 import com.zts.xtp.trade.model.request.*;
 import com.zts.xtp.trade.model.response.*;
@@ -41,8 +42,9 @@ public class TradeApi {
      * @param key 用户开发软件Key，用户申请开户时给予
      * @param xtpAPIlogLevel xtp api 日志输出级别
      * @param jniLogLevel  jni c++部分的日志级别
+     * @param resumeType 设置公共流（订单响应、成交回报）重传方式
      */
-    public void init(short clientId, String key, String logFolder, XtpLogLevel  xtpAPIlogLevel, JniLogLevel jniLogLevel){
+    public void init(short clientId, String key, String logFolder, XtpLogLevel  xtpAPIlogLevel, JniLogLevel jniLogLevel,XtpTeResumeType resumeType){
         if(!JNILoadLibrary.glogHasInited){
             JNILoadLibrary.glogHasInited = true;
             //init glog
@@ -65,7 +67,7 @@ public class TradeApi {
 
             initGlog(logFolder,logSubFolder,strJniLogLevel);
         }
-        tradeInit(clientId,key,logFolder,xtpAPIlogLevel);
+        tradeInit(clientId,key,logFolder,xtpAPIlogLevel,resumeType);
     }
 
     /**
@@ -83,8 +85,25 @@ public class TradeApi {
      * @param key 用户开发软件Key，用户申请开户时给予
      * @param logFolder 日志输出的目录，请设定一个真实存在的有可写权限的路径
      * @param logLevel xtp api 日志输出级别
+     * @param resumeType XTP_TERT_RESTART:从本交易日开始重传 XTP_TERT_RESUME:(保留字段，此方式暂未支持)从上次收到的续传 XTP_TERT_QUICK:只传送登录后公共流的内容  详细查看subscribePublicTopic方法 通过这里设置和通过subscribePublicTopic是二选一的两种方式。
      */
-    private native void tradeInit(short clientId, String key, String logFolder, XtpLogLevel logLevel);
+    private native void tradeInit(short clientId, String key, String logFolder, XtpLogLevel logLevel,XtpTeResumeType resumeType);
+
+
+    /**
+     * 设置公共流（订单响应、成交回报）重传方式
+     * 该方法要在Login方法前调用，或通过tradeInit传入resumeType调用。注意在用户断线后，如果不登出就login()，公共流订阅方式不会起作用。用户只会收到断线后的所有消息。如果先logout()再login()，那么公共流订阅方式会起作用，用户收到的数据会根据用户的选择方式而定。jvm中所有用户公用同一个重传方式，以最后一次设置为准。
+     * @param resumeType XTP_TERT_RESTART:从本交易日开始重传 XTP_TERT_RESUME:(保留字段，此方式暂未支持)从上次收到的续传 XTP_TERT_QUICK:只传送登录后公共流的内容
+     */
+    public native void subscribePublicTopic(XtpTeResumeType resumeType);
+
+
+    /**
+     *  此函数必须在Login之前、init之后调用
+     *  用于设置检测心跳超时的时间，并非设置发心跳包的频率，默认15秒检测一次，建议设置30秒以上，设置过小会引发断线，该方法一般用于debug加断点时防止断开连接，一般正常业务时无需设置
+     * @param interval interval 心跳检测时间间隔，单位为秒
+     */
+    public native void setHeartBeatInterval(int interval);
 
     /**
      * 断开连接并清除交易模块
@@ -147,6 +166,16 @@ public class TradeApi {
     public native int queryOrders(OrderQueryRequest queryOrderReq, String sessionId, int requestId);
 
     /**
+     * 分页请求查询报单
+     * 该方法支持分页查询，注意用户需要记录下最后一笔查询结果的reference以便用户下次查询使用
+     * @param queryOrderByPageReq 需要分页查询订单的条件，如果第一次查询，那么queryOrderByPageReq.reference填0
+     * @param sessionId 资金账户对应的sessionId,登录时得到
+     * @param requestId 用于用户定位查询响应的ID，由用户自定义
+     * @return 查询是否成功，“0”表示成功，非“0”表示出错，此时用户可以调用GetApiLastError()来获取错误代码
+     */
+    public native void queryOrdersByPage(OrderQueryByPageReq queryOrderByPageReq, String sessionId, int requestId);
+
+    /**
      * 根据委托编号请求查询相关成交
      * 此函数查询出的结果可能对应多个查询结果响应
      * @param orderXtpId 需要查询的报单在xtp系统中的ID，即InsertOrder()orderXtpId
@@ -165,6 +194,17 @@ public class TradeApi {
      * @return 查询是否成功，“0”表示成功，非“0”表示出错，此时用户可以调用GetApiLastError()来获取错误代码
      */
     public native int queryTrades(TraderQueryRequest queryTraderReq, String sessionId, int requestId);
+
+
+    /**
+     * 分页请求查询成交回报
+     * 该方法支持分页查询，注意用户需要记录下最后一笔查询结果的reference以便用户下次查询使用
+     * @param queryTradeByPageReq 需要分页查询成交回报的条件，如果第一次查询，那么queryTradeByPageReq.reference填0
+     * @param sessionId 资金账户对应的sessionId,登录时得到
+     * @param requestId 用于用户定位查询响应的ID，由用户自定义
+     * @return 查询是否成功，“0”表示成功，非“0”表示出错，此时用户可以调用GetApiLastError()来获取错误代码
+     */
+    public native void queryTradesByPage(TradeQueryByPageReq queryTradeByPageReq, String sessionId, int requestId);
 
     /**
      * 请求查询投资者持仓
@@ -254,6 +294,43 @@ public class TradeApi {
      */
     public native int queryOptionAuctionInfo(OptionAuctionInfoRequest optionAuctionInfoRequest, String sessionId, int requestId);
 
+    /**
+     * 获取当前交易日
+     * 只有登录成功后,才能得到正确的交易日
+     * @return 获取到的交易日
+     */
+    public native String getTradingDay();
+
+    /**
+     * 获取API的发行版本号
+     * @return 返回api发行版本号
+     */
+    public native String getApiVersion();
+
+    /**
+     * 通过报单在xtp系统中的ID获取下单的客户端id
+     * @remark 由于系统允许同一用户在不同客户端上登录操作，每个客户端通过不同的client_id进行区分
+     * @param orderXtpId 报单在xtp系统中的ID
+     * @return 返回客户端id，可以用此方法过滤自己下的订单
+     */
+    public native short getClientIDByXTPID(String orderXtpId);
+
+    /**
+     * 通过报单在xtp系统中的ID获取相关资金账户名
+     * @remark 只有资金账户登录成功后,才能得到正确的信息
+     * @param orderXtpId 报单在xtp系统中的ID
+     * @return 返回资金账户名
+     */
+    public native String getAccountByXTPID(String orderXtpId);
+
+
+    /**
+     * 服务器是否重启过
+     * 此函数必须在Login之后调用
+     * @param session_id 资金账户对应的session_id,登录时得到
+     * @return true表示重启过，false表示没有重启过
+     */
+    public native  boolean isServerRestart(String session_id);
 
     //====================================Callback Functions==========================================
     private void onDisconnect(String sessionId, int reason) {
@@ -276,12 +353,20 @@ public class TradeApi {
         tradeSpi.onCancelOrderError(cancelInfo, errorMessage, sessionId);
     }
 
-    private void onQueryOrder (OrderResponse orderInfo, ErrorMessage errorMessage, String sessionId) {
+    private void onQueryOrder(OrderResponse orderInfo, ErrorMessage errorMessage, String sessionId) {
         tradeSpi.onQueryOrder(orderInfo, errorMessage, sessionId);
+    }
+
+    private void onQueryOrderByPage(OrderResponse orderInfo, long reqCount, long orderSequence, long queryReference, String sessionId) {
+        tradeSpi.onQueryOrderByPage(orderInfo, reqCount, orderSequence, queryReference, sessionId);
     }
 
     private void onQueryTrade(TradeResponse tradeInfo, ErrorMessage errorMessage, String sessionId) {
         tradeSpi.onQueryTrade(tradeInfo, errorMessage, sessionId);
+    }
+
+    private void onQueryTradeByPage(TradeResponse tradeInfo, long reqCount, long tradeSequence, long queryReference, String sessionId) {
+        tradeSpi.onQueryTradeByPage(tradeInfo, reqCount, tradeSequence, queryReference, sessionId);
     }
 
     private void onQueryPosition(StockPositionResponse stockPositionInfo, ErrorMessage errorMessage, String sessionId) {
